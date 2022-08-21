@@ -7,16 +7,18 @@ class MetaCNVD(db.Model):
     id = db.Column(db.Integer, primary_key=True)  # 主键
     create_time = db.Column(db.DateTime, default=datetime.utcnow)  # 创建时间
     update_time = db.Column(db.DateTime, default=datetime.utcnow)  # 更新时间
-    cnvd_id = db.Column(db.String(20), unique=True)  # CNVD编号
-    cve_id = db.Column(db.String(20), unique=True)  # CVE编号
+    cnvd_id = db.Column(db.String(20))  # CNVD编号
+    cve_id = db.Column(db.String(20))  # CVE编号
+    cve_url = db.Column(db.String(250))
     name = db.Column(db.String(250))  # 漏洞名称
     level = db.Column(db.String(20))  # 漏洞危险等级
     vuln_category = db.Column(db.String(250))  # 漏洞类型
-    submit_date = db.Column(db.DateTime)  # 报送时间
-    open_date = db.Column(db.DateTime)  # 公开时间
+    submit_date = db.Column(db.String(250))  # 报送日期
+    open_date = db.Column(db.String(250))  # 公开日期
+    reference = db.Column(db.Text)  # 参考链接
     fix_method = db.Column(db.Text)  # 解决方案
     vuln_description = db.Column(db.Text)  # 漏洞描述
-    patch_name = db.Column(db.String(250))  # 补丁名称
+    patch_name = db.Column(db.Text)  # 补丁名称
     patch_description = db.Column(db.Text)  # 补丁描述
 
 
@@ -25,14 +27,6 @@ class MetaCNVDProduct(db.Model):
     create_time = db.Column(db.DateTime, default=datetime.utcnow)  # 创建时间
     update_time = db.Column(db.DateTime, default=datetime.utcnow)  # 更新时间
     product = db.Column(db.String(250))  # 产品名称
-    cnvd_id = db.Column(db.String(20))  # CNVD编号
-
-
-class MetaCNVDReference(db.Model):
-    id = db.Column(db.Integer, primary_key=True)  # 主键
-    create_time = db.Column(db.DateTime, default=datetime.utcnow)  # 创建时间
-    update_time = db.Column(db.DateTime, default=datetime.utcnow)  # 更新时间
-    reference = db.Column(db.Text)  # 参考链接
     cnvd_id = db.Column(db.String(20))  # CNVD编号
 
 

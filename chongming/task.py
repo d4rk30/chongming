@@ -1,9 +1,10 @@
 from chongming import db
-from chongming.models import MetaNVD, MetaNVDJSONData, MetaNVDReference, MetaNVDCWE
+from chongming.models import MetaNVD, MetaNVDJSONData, MetaNVDReference, MetaNVDCWE, MetaCNVD, MetaCNVDProduct
 from apscheduler.schedulers.background import BackgroundScheduler
 import requests
 import json
 from datetime import datetime, timedelta
+from bs4 import BeautifulSoup
 
 scheduler = BackgroundScheduler()
 
@@ -151,17 +152,53 @@ def job1_get_nvd_data():
         nvd_control_kits.analysis()
 
 
+def get_cnvd_text(bs4xml):
+    if bs4xml is not None:
+        return bs4xml.get_text()
+    else:
+        return None
+
+
 # 获取CNVD的数据，解析xml数据，每周一次，记录在Meta表中
 def job2_get_cnvd_data():
-    pass
-    download_xml_url = ""
-    rs = requests.get(download_xml_url)
+    # download_xml_url = ""
+    # rs = requests.get(download_xml_url)
+    soup = BeautifulSoup(open("meta/cnvd/2022-08-08_2022-08-14.xml"), "xml")
+    # 解析cnvd基本信息
+    for bs_xml in soup.find_all('vulnerability'):
+        cnvd_id = get_cnvd_text(bs_xml.number)
+        cve_id = get_cnvd_text(bs_xml.cveNumber)
+        cve_url = get_cnvd_text(bs_xml.cveUrl)
+        name = get_cnvd_text(bs_xml.title)
+        level = get_cnvd_text(bs_xml.serverity)
+        vuln_category = get_cnvd_text(bs_xml.isEvent)
+        submit_date = get_cnvd_text(bs_xml.submitTime)
+        open_date = get_cnvd_text(bs_xml.openTime)
+        reference = get_cnvd_text(bs_xml.referenceLink)
+        fix_method = get_cnvd_text(bs_xml.formalWay)
+        vuln_description = get_cnvd_text(bs_xml.description)
+        patch_name = get_cnvd_text(bs_xml.patchName)
+        patch_description = get_cnvd_text(bs_xml.patchDescription)
+        meta_cnvd = MetaCNVD(cnvd_id=cnvd_id, cve_id=cve_id, cve_url=cve_url, name=name, level=level,
+                             vuln_category=vuln_category, submit_date=submit_date, open_date=open_date,
+                             reference=reference, fix_method=fix_method, vuln_description=vuln_description,
+                             patch_name=patch_name, patch_description=patch_description)
+        db.session.add(meta_cnvd)
+        db.session.commit()
+        # 解析CNVD产品信息
+        for item in bs_xml.products:
+            product = get_cnvd_text(item)
+            meta_cnvd_product = MetaCNVDProduct(product=product, cnvd_id=cnvd_id)
+            db.session.add(meta_cnvd_product)
+            db.session.commit()
+    print("任务完成")
+
 
 # 每小时运行一次
 scheduler.add_job(
-    job1_get_nvd_data,
+    job2_get_cnvd_data,
     trigger='interval',
-    seconds=5
+    seconds=10
 )
 
 scheduler.start()
