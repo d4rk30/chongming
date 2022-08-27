@@ -6,4 +6,4 @@ app.config.from_pyfile('setting.py')
 
 db = SQLAlchemy(app)
 
-from chongming import views, commond,task
+from chongming import views, commond, task

@@ -128,3 +128,11 @@ class MeatCNNVDReference(db.Model):
     ref_source = db.Column(db.String(20))  # 参考链接来源
     ref_name = db.Column(db.String(250))  # 参考链接名称
     ref_url = db.Column(db.Text)  # 参考链接地址
+
+
+class ErrorLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)  # 主键
+    create_time = db.Column(db.DateTime, default=datetime.utcnow)  # 创建时间
+    update_time = db.Column(db.DateTime, default=datetime.utcnow)  # 更新时间
+    log_source = db.Column(db.String(250))  # 日志来源
+    log_details = db.Column(db.Text)  # 日志记录
