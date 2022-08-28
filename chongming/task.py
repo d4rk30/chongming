@@ -1,15 +1,14 @@
-import time
-
 from chongming.models import MetaNVD, MetaNVDJSONData, MetaNVDReference, MetaNVDCWE, MetaCNVD, MetaCNVDProduct
 from apscheduler.schedulers.background import BackgroundScheduler
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
 from selenium import webdriver
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import requests
 import json
-
+import time
 
 from chongming import db
 
@@ -169,6 +168,7 @@ def get_cnvd_text(bs4xml):
 # 获取CNVD的数据，解析xml数据，每周一次，记录在Meta表中
 def job2_get_cnvd_data():
     """
+    任务2：获取cnvd打包数据，每周一下午北京时间18点03分开始执行
     cnvd数据地址
     2017-04-10_2017-04-16.xml 到 2014-12-29_2015-01-04.xml
     id取值 243-362
@@ -188,6 +188,7 @@ def job2_get_cnvd_data():
     start_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
     end_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
     filename = start_date + "_" + end_date + ".xml"
+    filename = "2022-08-15_2022-08-21.xml"
     with open('meta/cnvd/download.json', 'r') as f:
         data = json.load(f)
     file_id = data["id"]
@@ -210,45 +211,62 @@ def job2_get_cnvd_data():
              '''
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": script})
     driver.get(download_url)
-    time.sleep(20)
-    # 读取下载的文件
-    soup = BeautifulSoup(open("meta/cnvd/2022-08-15_2022-08-21.xml"), "xml")
-    # 解析cnvd基本信息
-    for bs_xml in soup.find_all('vulnerability'):
-        cnvd_id = get_cnvd_text(bs_xml.number)
-        cve_id = get_cnvd_text(bs_xml.cveNumber)
-        cve_url = get_cnvd_text(bs_xml.cveUrl)
-        name = get_cnvd_text(bs_xml.title)
-        level = get_cnvd_text(bs_xml.serverity)
-        vuln_category = get_cnvd_text(bs_xml.isEvent)
-        submit_date = get_cnvd_text(bs_xml.submitTime)
-        open_date = get_cnvd_text(bs_xml.openTime)
-        reference = get_cnvd_text(bs_xml.referenceLink)
-        fix_method = get_cnvd_text(bs_xml.formalWay)
-        vuln_description = get_cnvd_text(bs_xml.description)
-        patch_name = get_cnvd_text(bs_xml.patchName)
-        patch_description = get_cnvd_text(bs_xml.patchDescription)
-        meta_cnvd = MetaCNVD(cnvd_id=cnvd_id, cve_id=cve_id, cve_url=cve_url, name=name, level=level,
-                             vuln_category=vuln_category, submit_date=submit_date, open_date=open_date,
-                             reference=reference, fix_method=fix_method, vuln_description=vuln_description,
-                             patch_name=patch_name, patch_description=patch_description)
-        db.session.add(meta_cnvd)
-        db.session.commit()
-        # 解析CNVD产品信息
-        for item in bs_xml.products:
-            product = get_cnvd_text(item)
-            meta_cnvd_product = MetaCNVDProduct(product=product, cnvd_id=cnvd_id)
-            db.session.add(meta_cnvd_product)
+    time.sleep(10)
+    e404 = driver.find_elements(By.TAG_NAME, "iframe")
+    if not e404:
+        data = {'id': file_id + 5}
+        with open('meta/cnvd/download.json', 'w') as f:
+            json.dump(data, f)
+        # 读取下载的文件
+        soup = BeautifulSoup(open("meta/cnvd/" + filename), "xml")
+        # 解析cnvd基本信息
+        for bs_xml in soup.find_all('vulnerability'):
+            cnvd_id = get_cnvd_text(bs_xml.number)
+            cve_id = get_cnvd_text(bs_xml.cveNumber)
+            cve_url = get_cnvd_text(bs_xml.cveUrl)
+            name = get_cnvd_text(bs_xml.title)
+            level = get_cnvd_text(bs_xml.serverity)
+            vuln_category = get_cnvd_text(bs_xml.isEvent)
+            submit_date = get_cnvd_text(bs_xml.submitTime)
+            open_date = get_cnvd_text(bs_xml.openTime)
+            reference = get_cnvd_text(bs_xml.referenceLink)
+            fix_method = get_cnvd_text(bs_xml.formalWay)
+            vuln_description = get_cnvd_text(bs_xml.description)
+            patch_name = get_cnvd_text(bs_xml.patchName)
+            patch_description = get_cnvd_text(bs_xml.patchDescription)
+            meta_cnvd = MetaCNVD(cnvd_id=cnvd_id, cve_id=cve_id, cve_url=cve_url, name=name, level=level,
+                                 vuln_category=vuln_category, submit_date=submit_date, open_date=open_date,
+                                 reference=reference, fix_method=fix_method, vuln_description=vuln_description,
+                                 patch_name=patch_name, patch_description=patch_description)
+            db.session.add(meta_cnvd)
             db.session.commit()
-    print("任务完成")
-    driver.quit()
+            # 解析CNVD产品信息
+            for item in bs_xml.products:
+                product = get_cnvd_text(item)
+                meta_cnvd_product = MetaCNVDProduct(product=product, cnvd_id=cnvd_id)
+                db.session.add(meta_cnvd_product)
+                db.session.commit()
+        print("任务完成")
+        driver.quit()
+    else:
+        # 出现404错误时候，一般是id规律产生了变动，需要重新分析下载链接的自增id步数
+        print("404错误")
+        driver.quit()
 
 
-# 每小时运行一次
+# 每小时运行
+scheduler.add_job(
+    job1_get_nvd_data,
+    trigger='interval',
+    hours=1
+)
+# 每周一18点3分运行
 scheduler.add_job(
     job2_get_cnvd_data,
-    trigger='interval',
-    seconds=60
+    trigger='cron',
+    day_of_week='mon',
+    hour=18,
+    minute=3
 )
 
 scheduler.start()
